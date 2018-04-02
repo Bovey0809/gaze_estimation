@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import skimage
 from scipy.io import loadmat
 import numpy as np
-import pands as pd
+import pandas as pd
 import glob
 
 def normalize(poinrts):
@@ -26,7 +26,13 @@ def annotation_file_reader(file_address):
     return pd.read_csv(file_address, delim_whitespace=True, names=[i for i in range(1, 29)], index_col=False)
 
 def get_Calibration(person):
-    "Return three calibration xxx.mat address."
+    '''
+    Return camera.mat, monitorPose.mat, screenSize.mat files address.
+    
+    Example
+    -------
+    calibration_files[0] is the camera.mat file address.
+    ''' 
     MPIIFaceGaze_address = '/nfshome/xueqin/deeplearning/gaze_estimation/data/all_writte/MPIIFaceGaze/'
     calibration_files = glob.glob(MPIIFaceGaze_address+'p{:02}/Calibration/*.mat'.format(person))
     # print(calibration_files)
@@ -68,18 +74,7 @@ def read_image(file_address):
     '''
     return cv2.cvtColor(cv2.imread(file_address), cv2.COLOR_BGR2RGB)
 
-# not all the files are included in the annotation.txt file.
-# The draw task should be used to related the annotation file.
-# So that all the parameters should be used according to the annotation file.
-# open once, extract
-# file address
-# Camera matrix. rotation, translation, distortion
-# landmarks
-# Gaze location
-# estimated head pose (what is this)
-# face center
-# gaze target
-# left or right
+
 def parameter_extracter(annotation_df, person):
     root_directory = '/nfshome/xueqin/deeplearning/gaze_estimation/data/all_writte/MPIIFaceGaze/p{:02}/'.format(person)
     file_address = root_directory + annotation_df[1]
@@ -98,14 +93,35 @@ def draw_gaze(image, start, face_center, gaze_target, camera_matrix, diss, rotat
     cv2.line(image, tuple(start), tuple(map(int, (end_point[0][0]))), (255, 0, 0), 2)
     return image
 
-def draw_image(person):
+def draw_image(person, photo_number, vector_number):
+    '''
+    Return image with gaze line drawed on it.
+    
+    Parameters
+    ----------
+    person: int, person that you want to analyse.
+    photo_number: int, which photo you wanna use to draw pictures.
+    vector_number: index of (rotation, translation) vectors to use as camera matrix
+    
+    Returns
+    -------
+    numpy array
+    
+    Example
+    -------
+    draw(1, 1, 8) --> numpy array with shape (1280, 720)
+    '''
+    # camera matrix, distortion vector, rotation vector, translation vector.
+    t_cameraMatrix, t_dist, t_rotation, t_translation = read_camara_mx(get_Calibration(person)[0])
     annotation_dataframe = annotation_file_reader(annotationDr(person))
     parameters = parameter_extracter(annotation_dataframe,person)
-    im = plt.imread(parameters[0][0])
-    image_points = parameters[2][0].reshape((6,2))
-    landmarks = parameters[2][0]
+    im = plt.imread(parameters[0][photo_number])
+    image_points = parameters[2][photo_number].reshape((6,2))
+    landmarks = parameters[2][photo_number]
+    face_center = parameters[4][photo_number]
+    gaze_target = parameters[5][photo_number]
     test_image = draw_gaze(im, landmarks.reshape(-1, 2)[0], 
-                           parameters[4][0], parameters[5][0], 
-                           t_cameraMatrix, t_dist, t_rotation[9], t_translation[9])
+                           face_center, gaze_target, 
+                           t_cameraMatrix, t_dist, t_rotation[vector_number], t_translation[vector_number])
     return test_image
 
